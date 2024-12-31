@@ -190,7 +190,16 @@ export default {
   created() {
     // 从 URL 参数判断是否显示注册表单
     const urlParams = new URLSearchParams(window.location.search);
-    this.isRegistering = urlParams.get('register') === 'true';
+    this.isRegistering = urlParams.get('tab') === 'register';
+  },
+  watch: {
+    // 监听路由变化
+    '$route.query': {
+      handler(query) {
+        this.isRegistering = query.tab === 'register';
+      },
+      immediate: true
+    }
   }
 };
 </script>

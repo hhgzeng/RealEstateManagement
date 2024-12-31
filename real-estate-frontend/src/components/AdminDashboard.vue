@@ -1,11 +1,33 @@
 <template>
   <div class="admin-dashboard">
     <div class="header">
-      <h2>管理员管理系统</h2>
+      <h2>欢迎回来，{{ username }}</h2>
       <button class="logout-btn" @click="logout">退出登录</button>
     </div>
 
     <div class="main-content">
+      <!-- 个人信息部分 -->
+      <div class="section">
+        <h3>我的信息</h3>
+        <div class="card user-info">
+          <div class="info-grid">
+            <div class="info-item">
+              <span class="label">用户名：</span>
+              <span class="value">{{ username }}</span>
+            </div>
+            <div class="info-item">
+              <span class="label">角色：</span>
+              <span class="value">管理员</span>
+            </div>
+            <div class="info-item">
+              <button @click="showChangePassword = true" class="btn btn-primary">
+                修改密码
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- 房产管理部分 -->
       <div class="section">
         <h3>房产管理</h3>
@@ -41,41 +63,79 @@
         <div class="section">
           <div class="section-header">
             <h3>在售房产</h3>
-            <div class="actions">
+          </div>
+          <div class="card">
+            <!-- 添加筛选功能 -->
+            <div class="filters">
+              <div class="filter-group">
+                <label>价格区间：</label>
+                <input 
+                  v-model.number="filters.minPrice" 
+                  type="number" 
+                  placeholder="最低价" 
+                />
+                <span>-</span>
+                <input 
+                  v-model.number="filters.maxPrice" 
+                  type="number" 
+                  placeholder="最高价" 
+                />
+              </div>
+              <div class="filter-group">
+                <label>面积区间：</label>
+                <input 
+                  v-model.number="filters.minArea" 
+                  type="number" 
+                  placeholder="最小面积" 
+                />
+                <span>-</span>
+                <input 
+                  v-model.number="filters.maxArea" 
+                  type="number" 
+                  placeholder="最大面积" 
+                />
+              </div>
+              <button class="filter-btn" @click="applyFilters">筛选</button>
+              <button class="reset-btn" @click="resetFilters">重置</button>
+            </div>
+
+            <div class="houses-grid">
+              <div v-for="house in displayedHouses" :key="house.id" class="house-card">
+                <div class="house-info">
+                  <h4>房产编号: {{ house.id }}</h4>
+                  <div class="info-row">
+                    <span class="label">价格：</span>
+                    <span class="value price">¥{{ formatPrice(house.price) }}</span>
+                  </div>
+                  <div class="info-row">
+                    <span class="label">面积：</span>
+                    <span class="value">{{ house.area }}㎡</span>
+                  </div>
+                  <div class="info-row">
+                    <span class="label">楼层：</span>
+                    <span class="value">{{ house.floor }}层</span>
+                  </div>
+                  <div class="info-row">
+                    <span class="label">销售人员：</span>
+                    <span class="value">{{ house.salesperson_name }}</span>
+                  </div>
+                </div>
+                <div class="house-actions">
+                  <button @click="editHouse(house)" class="edit-btn">修改</button>
+                  <button @click="confirmDeleteHouse(house)" class="delete-btn">删除</button>
+                </div>
+              </div>
+            </div>
+
+            <div v-if="availableHouses.length > 8" class="show-more">
               <button @click="toggleShowAllHouses" class="toggle-btn">
-                {{ showAllHouses ? '收起' : '显示全部' }}
+                {{ showAllHouses ? '收起' : `显示更多 (还有${availableHouses.length - 8}个)` }}
               </button>
             </div>
-          </div>
-          <div class="houses-grid">
-            <div v-for="house in displayedHouses" :key="house.id" class="house-card">
-              <div class="house-info">
-                <h4>房产编号: {{ house.id }}</h4>
-                <div class="info-row">
-                  <span class="label">价格：</span>
-                  <span class="value price">¥{{ formatPrice(house.price) }}</span>
-                </div>
-                <div class="info-row">
-                  <span class="label">面积：</span>
-                  <span class="value">{{ house.area }}㎡</span>
-                </div>
-                <div class="info-row">
-                  <span class="label">楼层：</span>
-                  <span class="value">{{ house.floor }}层</span>
-                </div>
-                <div class="info-row">
-                  <span class="label">销售人员：</span>
-                  <span class="value">{{ house.salesperson_name }}</span>
-                </div>
-              </div>
-              <div class="house-actions">
-                <button @click="editHouse(house)" class="edit-btn">修改</button>
-                <button @click="confirmDeleteHouse(house)" class="delete-btn">删除</button>
-              </div>
+
+            <div v-if="availableHouses.length === 0" class="no-data">
+              暂无在售房产
             </div>
-          </div>
-          <div v-if="displayedHouses.length === 0" class="no-data">
-            暂无在售房产
           </div>
         </div>
       </div>
@@ -190,14 +250,26 @@
         </form>
       </div>
     </div>
+
+    <!-- 修改密码对话框 -->
+    <div v-if="showChangePassword" class="modal">
+      <div class="modal-content">
+        <span class="close" @click="showChangePassword = false">&times;</span>
+        <ChangePassword @passwordChanged="handlePasswordChanged" />
+      </div>
+    </div>
   </div>
 </template>
 
 <script>
 import axios from 'axios';
+import ChangePassword from './ChangePassword.vue';
 
 export default {
   name: 'AdminDashboardPage',
+  components: {
+    ChangePassword,
+  },
   data() {
     return {
       house: { price: '', area: '', floor: '', salespersonId: '' },
@@ -211,6 +283,14 @@ export default {
       salespeople: [],
       showEditDialog: false,
       editingHouse: null,
+      showChangePassword: false,
+      username: localStorage.getItem('username'),
+      filters: {
+        minPrice: '',
+        maxPrice: '',
+        minArea: '',
+        maxArea: ''
+      }
     };
   },
   computed: {
@@ -220,9 +300,22 @@ export default {
       );
       return this.showAllRecords ? sortedRecords : sortedRecords.slice(0, 5);
     },
+    availableHouses() {
+      const houses = this.houses.filter(house => house.status === 'available');
+      return houses.filter(house => {
+        const price = parseFloat(house.price);
+        const area = parseFloat(house.area);
+        
+        if (this.filters.minPrice && price < this.filters.minPrice) return false;
+        if (this.filters.maxPrice && price > this.filters.maxPrice) return false;
+        if (this.filters.minArea && area < this.filters.minArea) return false;
+        if (this.filters.maxArea && area > this.filters.maxArea) return false;
+        
+        return true;
+      });
+    },
     displayedHouses() {
-      const availableHouses = this.houses.filter(house => house.status === 'available');
-      return this.showAllHouses ? availableHouses : availableHouses.slice(0, 10);
+      return this.showAllHouses ? this.availableHouses : this.availableHouses.slice(0, 8);
     }
   },
   created() {
@@ -419,7 +512,25 @@ export default {
     },
     toggleShowAllHouses() {
       this.showAllHouses = !this.showAllHouses;
-    }
+    },
+    handlePasswordChanged() {
+      this.showChangePassword = false;
+      // 可以添加其他处理逻辑，比如显示成功消息
+    },
+    applyFilters() {
+      // 重置显示状态，确保从第一页开始显示
+      this.showAllHouses = false;
+    },
+    resetFilters() {
+      this.filters = {
+        minPrice: '',
+        maxPrice: '',
+        minArea: '',
+        maxArea: ''
+      };
+      // 重置显示状态
+      this.showAllHouses = false;
+    },
   },
 };
 </script>
@@ -640,7 +751,7 @@ button:hover {
 
 .houses-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  grid-template-columns: repeat(4, 1fr);
   gap: 20px;
   margin-top: 20px;
 }
@@ -747,5 +858,166 @@ button:hover {
   color: #666;
   background: #f8f9fa;
   border-radius: 8px;
+}
+
+.password-section {
+  margin: 20px 0;
+}
+
+.modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  background-color: white;
+  padding: 20px;
+  border-radius: 8px;
+  position: relative;
+  width: 90%;
+  max-width: 500px;
+}
+
+.close {
+  position: absolute;
+  right: 10px;
+  top: 10px;
+  font-size: 24px;
+  cursor: pointer;
+}
+
+.close:hover {
+  color: #666;
+}
+
+.user-info {
+  margin-bottom: 20px;
+}
+
+.info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 15px;
+  align-items: center;
+}
+
+.info-item {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.info-item .label {
+  color: #666;
+  min-width: 70px;
+}
+
+.info-item .value {
+  font-weight: 500;
+  color: #2c3e50;
+}
+
+.btn-primary {
+  background-color: #007bff;
+  color: white;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.btn-primary:hover {
+  background-color: #0056b3;
+}
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  margin-bottom: 20px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid #eee;
+}
+
+.filter-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.filter-group input {
+  width: 100px;
+  padding: 8px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+.filter-btn {
+  background-color: #2196F3;
+  color: white;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.reset-btn {
+  background-color: #9e9e9e;
+  color: white;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.filter-btn:hover {
+  background-color: #1976D2;
+}
+
+.reset-btn:hover {
+  background-color: #757575;
+}
+
+@media (max-width: 768px) {
+  .filters {
+    flex-direction: column;
+  }
+  
+  .filter-group {
+    width: 100%;
+  }
+  
+  .filter-group input {
+    flex: 1;
+  }
+}
+
+@media (max-width: 1200px) {
+  .houses-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 900px) {
+  .houses-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 600px) {
+  .houses-grid {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

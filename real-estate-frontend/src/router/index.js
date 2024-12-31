@@ -3,6 +3,7 @@ import { createRouter, createWebHistory } from 'vue-router';
 // 引入组件
 import HomePage from '@/components/HomePage.vue';
 import LoginPage from '@/components/Login.vue';
+import RegisterPage from '@/components/Register.vue';
 import AdminDashboardPage from '@/components/AdminDashboard.vue';
 import SalesDashboardPage from '@/components/SalesDashboard.vue';
 import CustomerDashboardPage from '@/components/CustomerDashboard.vue';
@@ -18,6 +19,11 @@ const routes = [
     path: '/login',
     name: 'Login',
     component: LoginPage,
+  },
+  {
+    path: '/register',
+    name: 'Register',
+    component: RegisterPage,
   },
   {
     path: '/admin-dashboard',

@@ -19,6 +19,11 @@
               <span class="label">角色：</span>
               <span class="value">客户</span>
             </div>
+            <div class="info-item">
+              <button @click="showChangePassword = true" class="btn btn-primary">
+                修改密码
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -61,7 +66,7 @@
           </div>
 
           <div class="houses-grid">
-            <div v-for="house in filteredHouses" :key="house.id" class="house-card">
+            <div v-for="house in displayedHouses" :key="house.id" class="house-card">
               <div class="house-info">
                 <h4>房产编号: {{ house.id }}</h4>
                 <div class="info-row">
@@ -85,6 +90,12 @@
                 <button class="buy-btn" @click="initiatePayment(house)">购买</button>
               </div>
             </div>
+          </div>
+
+          <div v-if="filteredHouses.length > 8" class="show-more">
+            <button @click="toggleShowAllHouses" class="toggle-btn">
+              {{ showAllHouses ? '收起' : `显示更多 (还有${filteredHouses.length - 8}个)` }}
+            </button>
           </div>
 
           <div v-if="filteredHouses.length === 0" class="no-data">
@@ -179,14 +190,26 @@
         </div>
       </div>
     </div>
+
+    <!-- 修改密码对话框 -->
+    <div v-if="showChangePassword" class="modal">
+      <div class="modal-content">
+        <span class="close" @click="showChangePassword = false">&times;</span>
+        <ChangePassword @passwordChanged="handlePasswordChanged" />
+      </div>
+    </div>
   </div>
 </template>
 
 <script>
 import axios from 'axios';
+import ChangePassword from './ChangePassword.vue';
 
 export default {
   name: 'CustomerDashboard',
+  components: {
+    ChangePassword,
+  },
   data() {
     return {
       username: localStorage.getItem('username'),
@@ -203,7 +226,9 @@ export default {
       showPaymentDialog: false,
       paymentQRCode: null,
       orderNumber: null,
-      showAllOrders: false
+      showAllOrders: false,
+      showAllHouses: false,
+      showChangePassword: false
     };
   },
   computed: {
@@ -219,6 +244,9 @@ export default {
         
         return true;
       });
+    },
+    displayedHouses() {
+      return this.showAllHouses ? this.filteredHouses : this.filteredHouses.slice(0, 8);
     },
     displayedOrders() {
       // 先按时间倒序排序
@@ -340,6 +368,13 @@ export default {
     },
     toggleShowAllOrders() {
       this.showAllOrders = !this.showAllOrders;
+    },
+    handlePasswordChanged() {
+      this.showChangePassword = false;
+      // 可以添加其他处理逻辑，比如显示成功消息
+    },
+    toggleShowAllHouses() {
+      this.showAllHouses = !this.showAllHouses;
     }
   }
 };
@@ -393,11 +428,23 @@ export default {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 15px;
+  align-items: center;
 }
 
 .info-item {
   display: flex;
   gap: 10px;
+  align-items: center;
+}
+
+.info-item .label {
+  color: #666;
+  min-width: 70px;
+}
+
+.info-item .value {
+  font-weight: 500;
+  color: #2c3e50;
 }
 
 .filters {
@@ -424,28 +471,40 @@ export default {
 
 .houses-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  grid-template-columns: repeat(4, 1fr);
   gap: 20px;
   margin-top: 20px;
 }
 
 .house-card {
-  background: #f8f9fa;
+  background: white;
   border-radius: 8px;
-  padding: 15px;
+  padding: 20px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  transition: transform 0.2s;
   display: flex;
   flex-direction: column;
-  gap: 15px;
+}
+
+.house-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.2);
 }
 
 .house-info {
   flex: 1;
+  margin-bottom: 15px;
+}
+
+.house-info h4 {
+  margin: 0 0 15px 0;
+  color: #2c3e50;
 }
 
 .info-row {
   display: flex;
   justify-content: space-between;
-  margin-top: 8px;
+  margin-bottom: 8px;
 }
 
 .label {
@@ -457,8 +516,29 @@ export default {
 }
 
 .value.price {
-  color: #e53935;
+  color: #e74c3c;
   font-weight: bold;
+}
+
+.house-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: auto;
+}
+
+.buy-btn {
+  background-color: #4CAF50;
+  color: white;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.buy-btn:hover {
+  background-color: #388E3C;
 }
 
 .data-table {
@@ -488,6 +568,7 @@ export default {
   display: flex;
   justify-content: center;
   align-items: center;
+  z-index: 1000;
 }
 
 .modal-content {
@@ -496,6 +577,7 @@ export default {
   padding: 20px;
   width: 90%;
   max-width: 500px;
+  position: relative;
 }
 
 .confirm-content {
@@ -546,12 +628,6 @@ button {
   color: white;
 }
 
-.buy-btn {
-  background-color: #4CAF50;
-  color: white;
-  width: 100%;
-}
-
 .confirm-btn {
   background-color: #4CAF50;
   color: white;
@@ -570,24 +646,6 @@ button {
 
 button:hover {
   opacity: 0.9;
-}
-
-@media (max-width: 768px) {
-  .filters {
-    flex-direction: column;
-  }
-  
-  .filter-group {
-    width: 100%;
-  }
-  
-  .filter-group input {
-    flex: 1;
-  }
-  
-  .houses-grid {
-    grid-template-columns: 1fr;
-  }
 }
 
 .payment-dialog {
@@ -632,37 +690,80 @@ button:hover {
   margin-top: 20px;
 }
 
-.payment-actions button {
+.show-more {
+  text-align: center;
+  margin-top: 15px;
+}
+
+.toggle-btn {
+  background-color: #2196F3;
+  color: white;
   padding: 8px 16px;
   border: none;
   border-radius: 4px;
   cursor: pointer;
-}
-
-.confirm-btn {
-  background-color: #4CAF50;
-  color: white;
-}
-
-.show-more {
-  text-align: center;
-  margin-top: 15px;
-  padding-top: 10px;
-  border-top: 1px solid #eee;
-}
-
-.toggle-btn {
-  background-color: #f0f0f0;
-  color: #333;
-  padding: 8px 16px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  cursor: pointer;
-  transition: all 0.3s ease;
+  font-weight: 500;
+  transition: background-color 0.3s;
 }
 
 .toggle-btn:hover {
-  background-color: #e0e0e0;
+  background-color: #1976D2;
+}
+
+.btn-primary {
+  background-color: #007bff;
+  color: white;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.btn-primary:hover {
+  background-color: #0056b3;
+}
+
+.close {
+  position: absolute;
+  right: 10px;
+  top: 10px;
+  font-size: 24px;
+  cursor: pointer;
+}
+
+.close:hover {
+  color: #666;
+}
+
+@media (max-width: 1200px) {
+  .houses-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 900px) {
+  .houses-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 600px) {
+  .houses-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .filters {
+    flex-direction: column;
+  }
+  
+  .filter-group {
+    width: 100%;
+  }
+  
+  .filter-group input {
+    flex: 1;
+  }
 }
 </style>
   

@@ -6,6 +6,28 @@
     </div>
 
     <div class="main-content">
+      <!-- 个人信息部分 -->
+      <div class="section">
+        <h3>我的信息</h3>
+        <div class="card user-info">
+          <div class="info-grid">
+            <div class="info-item">
+              <span class="label">用户名：</span>
+              <span class="value">{{ username }}</span>
+            </div>
+            <div class="info-item">
+              <span class="label">角色：</span>
+              <span class="value">销售人员</span>
+            </div>
+            <div class="info-item">
+              <button @click="showChangePassword = true" class="btn btn-primary">
+                修改密码
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- 销售业绩统计 -->
       <div class="section">
         <h3>销售业绩</h3>
@@ -54,6 +76,40 @@
           <button class="add-btn" @click="showAddHouseDialog = true">添加房产</button>
         </div>
         <div class="card">
+          <!-- 添加筛选功能 -->
+          <div class="filters">
+            <div class="filter-group">
+              <label>价格区间：</label>
+              <input 
+                v-model.number="filters.minPrice" 
+                type="number" 
+                placeholder="最低价" 
+              />
+              <span>-</span>
+              <input 
+                v-model.number="filters.maxPrice" 
+                type="number" 
+                placeholder="最高价" 
+              />
+            </div>
+            <div class="filter-group">
+              <label>面积区间：</label>
+              <input 
+                v-model.number="filters.minArea" 
+                type="number" 
+                placeholder="最小面积" 
+              />
+              <span>-</span>
+              <input 
+                v-model.number="filters.maxArea" 
+                type="number" 
+                placeholder="最大面积" 
+              />
+            </div>
+            <button class="filter-btn" @click="applyFilters">筛选</button>
+            <button class="reset-btn" @click="resetFilters">重置</button>
+          </div>
+
           <div class="houses-grid">
             <div v-for="house in displayedAvailableHouses" :key="house.id" class="house-card">
               <div class="house-info">
@@ -76,12 +132,13 @@
               </div>
             </div>
           </div>
-          <div class="show-more" v-if="availableHouses.length > 10">
+
+          <div v-if="filteredAvailableHouses.length > 8" class="show-more">
             <button @click="toggleShowAllAvailable" class="toggle-btn">
-              {{ showAllAvailable ? '收起' : '显示更多' }}
+              {{ showAllAvailable ? '收起' : `显示更多 (还有${filteredAvailableHouses.length - 8}个)` }}
             </button>
           </div>
-          <div v-if="availableHouses.length === 0" class="no-data">
+          <div v-if="filteredAvailableHouses.length === 0" class="no-data">
             暂无在售房产
           </div>
         </div>
@@ -114,9 +171,10 @@
               </div>
             </div>
           </div>
-          <div class="show-more" v-if="soldHouses.length > 10">
+
+          <div v-if="soldHouses.length > 8" class="show-more">
             <button @click="toggleShowAllSold" class="toggle-btn">
-              {{ showAllSold ? '收起' : '显示更多' }}
+              {{ showAllSold ? '收起' : `显示更多 (还有${soldHouses.length - 8}个)` }}
             </button>
           </div>
           <div v-if="soldHouses.length === 0" class="no-data">
@@ -237,17 +295,30 @@
         </form>
       </div>
     </div>
+
+    <!-- 修改密码对话框 -->
+    <div v-if="showChangePassword" class="modal">
+      <div class="modal-content">
+        <span class="close" @click="showChangePassword = false">&times;</span>
+        <ChangePassword @passwordChanged="handlePasswordChanged" />
+      </div>
+    </div>
   </div>
 </template>
 
 <script>
 import axios from 'axios';
+import ChangePassword from './ChangePassword.vue';
 
 export default {
   name: 'SalesDashboard',
+  components: {
+    ChangePassword
+  },
   data() {
     return {
       username: localStorage.getItem('username'),
+      showChangePassword: false,
       salesStats: {
         totalSales: 0,
         totalAmount: 0
@@ -274,7 +345,13 @@ export default {
       },
       showAllRecords: false,
       showAllAvailable: false,
-      showAllSold: false
+      showAllSold: false,
+      filters: {
+        minPrice: '',
+        maxPrice: '',
+        minArea: '',
+        maxArea: ''
+      }
     };
   },
   computed: {
@@ -284,17 +361,24 @@ export default {
     soldHouses() {
       return this.myHouses.filter(house => house.status === 'sold');
     },
+    filteredAvailableHouses() {
+      return this.availableHouses.filter(house => {
+        const price = parseFloat(house.price);
+        const area = parseFloat(house.area);
+        
+        if (this.filters.minPrice && price < this.filters.minPrice) return false;
+        if (this.filters.maxPrice && price > this.filters.maxPrice) return false;
+        if (this.filters.minArea && area < this.filters.minArea) return false;
+        if (this.filters.maxArea && area > this.filters.maxArea) return false;
+        
+        return true;
+      });
+    },
     displayedAvailableHouses() {
-      if (this.showAllAvailable) {
-        return this.availableHouses;
-      }
-      return this.availableHouses.slice(0, 10);
+      return this.showAllAvailable ? this.filteredAvailableHouses : this.filteredAvailableHouses.slice(0, 8);
     },
     displayedSoldHouses() {
-      if (this.showAllSold) {
-        return this.soldHouses;
-      }
-      return this.soldHouses.slice(0, 10);
+      return this.showAllSold ? this.soldHouses : this.soldHouses.slice(0, 8);
     },
     displayedSalesRecords() {
       // 先按时间倒序排序
@@ -470,6 +554,24 @@ export default {
     },
     toggleShowAllSold() {
       this.showAllSold = !this.showAllSold;
+    },
+    handlePasswordChanged() {
+      this.showChangePassword = false;
+      alert('密码修改成功！');
+    },
+    applyFilters() {
+      // 重置显示状态，确保从第一页开始显示
+      this.showAllAvailable = false;
+    },
+    resetFilters() {
+      this.filters = {
+        minPrice: '',
+        maxPrice: '',
+        minArea: '',
+        maxArea: ''
+      };
+      // 重置显示状态
+      this.showAllAvailable = false;
     }
   }
 };
@@ -578,28 +680,40 @@ export default {
 
 .houses-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  grid-template-columns: repeat(4, 1fr);
   gap: 20px;
+  margin-top: 20px;
 }
 
 .house-card {
   background: white;
   border-radius: 8px;
-  padding: 15px;
+  padding: 20px;
   box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  transition: transform 0.2s;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+}
+
+.house-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.2);
 }
 
 .house-info {
   flex: 1;
+  margin-bottom: 15px;
+}
+
+.house-info h4 {
+  margin: 0 0 15px 0;
+  color: #2c3e50;
 }
 
 .info-row {
   display: flex;
   justify-content: space-between;
-  margin-top: 8px;
+  margin-bottom: 8px;
 }
 
 .label {
@@ -611,7 +725,7 @@ export default {
 }
 
 .value.price {
-  color: #e53935;
+  color: #e74c3c;
   font-weight: bold;
 }
 
@@ -635,6 +749,7 @@ export default {
   display: flex;
   justify-content: flex-end;
   gap: 10px;
+  margin-top: auto;
 }
 
 .data-table {
@@ -840,6 +955,139 @@ button:hover:not(:disabled) {
 
 .toggle-btn:hover {
   background-color: #e0e0e0;
+}
+
+.user-info {
+  margin-bottom: 20px;
+}
+
+.info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 15px;
+  align-items: center;
+}
+
+.info-item {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.info-item .label {
+  color: #666;
+  min-width: 70px;
+}
+
+.info-item .value {
+  font-weight: 500;
+  color: #2c3e50;
+}
+
+.btn-primary {
+  background-color: #007bff;
+  color: white;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.btn-primary:hover {
+  background-color: #0056b3;
+}
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  margin-bottom: 20px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid #eee;
+}
+
+.filter-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.filter-group input {
+  width: 100px;
+  padding: 8px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+.filter-btn {
+  background-color: #2196F3;
+  color: white;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.reset-btn {
+  background-color: #9e9e9e;
+  color: white;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.show-more {
+  text-align: center;
+  margin-top: 15px;
+}
+
+.toggle-btn {
+  background-color: #2196F3;
+  color: white;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: background-color 0.3s;
+}
+
+.toggle-btn:hover {
+  background-color: #1976D2;
+}
+
+@media (max-width: 1200px) {
+  .houses-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 900px) {
+  .houses-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 600px) {
+  .houses-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .filters {
+    flex-direction: column;
+  }
+  
+  .filter-group {
+    width: 100%;
+  }
+  
+  .filter-group input {
+    flex: 1;
+  }
 }
 </style>
   

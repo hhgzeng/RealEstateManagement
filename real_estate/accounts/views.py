@@ -118,3 +118,60 @@ def manage_salesperson(request):
                 'message': '服务器错误',
                 'status': 'error'
             }, status=500)
+
+@csrf_exempt
+def change_password(request):
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            user_id = data.get('user_id')
+            old_password = data.get('old_password')
+            new_password = data.get('new_password')
+
+            # 验证所有必需字段都已提供
+            if not all([user_id, old_password, new_password]):
+                return JsonResponse({
+                    'status': 'error',
+                    'message': '所有字段都是必需的'
+                }, status=400)
+
+            # 获取用户
+            try:
+                user = User.objects.get(id=user_id)
+            except User.DoesNotExist:
+                return JsonResponse({
+                    'status': 'error',
+                    'message': '用户不存在'
+                }, status=404)
+
+            # 验证旧密码
+            if user.password != old_password:
+                return JsonResponse({
+                    'status': 'error',
+                    'message': '旧密码不正确'
+                }, status=400)
+
+            # 更新密码
+            user.password = new_password
+            user.save()
+
+            return JsonResponse({
+                'status': 'success',
+                'message': '密码修改成功'
+            })
+
+        except json.JSONDecodeError:
+            return JsonResponse({
+                'status': 'error',
+                'message': '无效的JSON数据'
+            }, status=400)
+        except Exception as e:
+            return JsonResponse({
+                'status': 'error',
+                'message': str(e)
+            }, status=500)
+
+    return JsonResponse({
+        'status': 'error',
+        'message': '不支持的请求方法'
+    }, status=405)

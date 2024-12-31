@@ -1,81 +1,70 @@
 <template>
-  <div class="home-page">
+  <div class="home">
     <div class="header">
-      <h2>房产销售管理系统</h2>
+      <h2>欢迎来到房产销售系统</h2>
       <div class="auth-buttons">
-        <button class="login-btn" @click="$router.push('/login')">登录</button>
-        <button class="register-btn" @click="$router.push('/login?register=true')">注册</button>
+        <router-link to="/login" class="btn">登录</router-link>
+        <router-link :to="{ path: '/login', query: { tab: 'register' }}" class="btn">注册</router-link>
       </div>
     </div>
 
-    <div class="main-content">
-      <!-- 在售房产列表 -->
-      <div class="section">
-        <h3>在售房产</h3>
-        <div class="card">
-          <div class="filters">
-            <div class="filter-group">
-              <label>价格区间：</label>
-              <input 
-                v-model.number="filters.minPrice" 
-                type="number" 
-                placeholder="最低价" 
-              />
-              <span>-</span>
-              <input 
-                v-model.number="filters.maxPrice" 
-                type="number" 
-                placeholder="最高价" 
-              />
-            </div>
-            <div class="filter-group">
-              <label>面积区间：</label>
-              <input 
-                v-model.number="filters.minArea" 
-                type="number" 
-                placeholder="最小面积" 
-              />
-              <span>-</span>
-              <input 
-                v-model.number="filters.maxArea" 
-                type="number" 
-                placeholder="最大面积" 
-              />
-            </div>
-            <button class="filter-btn" @click="applyFilters">筛选</button>
-            <button class="reset-btn" @click="resetFilters">重置</button>
-          </div>
-
-          <div class="houses-grid">
-            <div v-for="house in filteredHouses" :key="house.id" class="house-card">
-              <div class="house-info">
-                <h4>房产编号: {{ house.id }}</h4>
-                <div class="info-row">
-                  <span class="label">价格：</span>
-                  <span class="value price">{{ formatPrice(house.price) }}</span>
-                </div>
-                <div class="info-row">
-                  <span class="label">面积：</span>
-                  <span class="value">{{ house.area }}㎡</span>
-                </div>
-                <div class="info-row">
-                  <span class="label">楼层：</span>
-                  <span class="value">{{ house.floor }}层</span>
-                </div>
-                <div class="info-row">
-                  <span class="label">销售人员：</span>
-                  <span class="value">{{ house.salesperson_name }}</span>
-                </div>
+    <!-- 在售房产列表 -->
+    <div class="section">
+      <h3>在售房产</h3>
+      <div class="filter-section">
+        <div class="price-filter">
+          <label>价格范围：</label>
+          <input type="number" v-model="minPrice" placeholder="最低价格" @input="applyFilters" />
+          <span>-</span>
+          <input type="number" v-model="maxPrice" placeholder="最高价格" @input="applyFilters" />
+        </div>
+        <div class="area-filter">
+          <label>面积范围：</label>
+          <input type="number" v-model="minArea" placeholder="最小面积" @input="applyFilters" />
+          <span>-</span>
+          <input type="number" v-model="maxArea" placeholder="最大面积" @input="applyFilters" />
+        </div>
+        <div class="filter-buttons">
+          <button @click="applyFilters" class="filter-btn">筛选</button>
+          <button @click="resetFilters" class="filter-btn reset">重置</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="houses-grid">
+          <div v-for="house in filteredHouses" :key="house.id" class="house-card">
+            <div class="house-info">
+              <h4>房产编号: {{ house.id }}</h4>
+              <div class="info-row">
+                <span class="label">价格：</span>
+                <span class="value price">¥{{ formatPrice(house.price) }}</span>
               </div>
-              <div class="house-actions">
-                <button class="buy-btn" @click="promptLogin">购买</button>
+              <div class="info-row">
+                <span class="label">面积：</span>
+                <span class="value">{{ house.area }}㎡</span>
+              </div>
+              <div class="info-row">
+                <span class="label">楼层：</span>
+                <span class="value">{{ house.floor }}层</span>
+              </div>
+              <div class="info-row">
+                <span class="label">状态：</span>
+                <span class="value">在售</span>
               </div>
             </div>
+            <div class="house-actions">
+              <router-link to="/login" class="action-btn">登录后购买</router-link>
+            </div>
           </div>
+        </div>
 
-          <div v-if="filteredHouses.length === 0" class="no-data">
-            暂无符合条件的房产
-          </div>
+        <div v-if="houses.length > 8" class="show-more">
+          <button @click="toggleShowAllHouses" class="toggle-btn">
+            {{ showAllHouses ? '收起' : `显示更多 (还有${houses.length - 8}个)` }}
+          </button>
+        </div>
+
+        <div v-if="houses.length === 0" class="no-data">
+          暂无在售房产
         </div>
       </div>
     </div>
@@ -90,69 +79,79 @@ export default {
   data() {
     return {
       houses: [],
-      filters: {
-        minPrice: '',
-        maxPrice: '',
-        minArea: '',
-        maxArea: ''
-      }
+      showAllHouses: false,
+      minPrice: '',
+      maxPrice: '',
+      minArea: '',
+      maxArea: '',
+      filteredResults: [],
     };
+  },
+  watch: {
+    minPrice() { this.applyFilters(); },
+    maxPrice() { this.applyFilters(); },
+    minArea() { this.applyFilters(); },
+    maxArea() { this.applyFilters(); }
   },
   computed: {
     filteredHouses() {
-      return this.houses.filter(house => {
-        const price = parseFloat(house.price);
-        const area = parseFloat(house.area);
-        
-        if (this.filters.minPrice && price < this.filters.minPrice) return false;
-        if (this.filters.maxPrice && price > this.filters.maxPrice) return false;
-        if (this.filters.minArea && area < this.filters.minArea) return false;
-        if (this.filters.maxArea && area > this.filters.maxArea) return false;
-        
-        return true;
-      });
+      return this.showAllHouses ? this.filteredResults : this.filteredResults.slice(0, 8);
     }
-  },
-  created() {
-    this.fetchHouses();
   },
   methods: {
     formatPrice(price) {
       return parseFloat(price).toLocaleString('zh-CN');
     },
+    toggleShowAllHouses() {
+      this.showAllHouses = !this.showAllHouses;
+    },
+    applyFilters() {
+      let filtered = this.houses;
+      
+      if (this.minPrice && !isNaN(parseFloat(this.minPrice))) {
+        filtered = filtered.filter(house => parseFloat(house.price) >= parseFloat(this.minPrice));
+      }
+      if (this.maxPrice && !isNaN(parseFloat(this.maxPrice))) {
+        filtered = filtered.filter(house => parseFloat(house.price) <= parseFloat(this.maxPrice));
+      }
+      if (this.minArea && !isNaN(parseFloat(this.minArea))) {
+        filtered = filtered.filter(house => parseFloat(house.area) >= parseFloat(this.minArea));
+      }
+      if (this.maxArea && !isNaN(parseFloat(this.maxArea))) {
+        filtered = filtered.filter(house => parseFloat(house.area) <= parseFloat(this.maxArea));
+      }
+      
+      this.filteredResults = filtered;
+    },
+    resetFilters() {
+      this.minPrice = '';
+      this.maxPrice = '';
+      this.minArea = '';
+      this.maxArea = '';
+      this.filteredResults = this.houses;
+    },
     async fetchHouses() {
       try {
         const response = await axios.get('http://localhost:8000/houses/get_houses/');
-        this.houses = response.data;
+        this.houses = response.data.filter(house => house.status === 'available');
+        this.filteredResults = this.houses;
       } catch (error) {
-        console.error('获取房产列表失败:', error);
+        console.error('Error fetching houses:', error);
       }
-    },
-    promptLogin() {
-      if (confirm('需要登录后才能购买房产，是否前往登录？')) {
-        this.$router.push('/login');
-      }
-    },
-    applyFilters() {
-      // 过滤功能已通过计算属性实现
-    },
-    resetFilters() {
-      this.filters = {
-        minPrice: '',
-        maxPrice: '',
-        minArea: '',
-        maxArea: ''
-      };
     }
+  },
+  created() {
+    this.fetchHouses();
   }
 };
 </script>
 
 <style scoped>
-.home-page {
+.home {
   padding: 20px;
   max-width: 1200px;
   margin: 0 auto;
+  background-color: #f5f5f5;
 }
 
 .header {
@@ -162,47 +161,26 @@ export default {
   margin-bottom: 30px;
 }
 
-.header h2 {
-  margin: 0;
-  color: #2c3e50;
-}
-
 .auth-buttons {
   display: flex;
   gap: 10px;
 }
 
-.login-btn, .register-btn {
+.btn {
   padding: 8px 16px;
-  border: none;
   border-radius: 4px;
-  cursor: pointer;
-  font-weight: 500;
+  text-decoration: none;
+  color: white;
+  background-color: #2196F3;
   transition: background-color 0.3s;
 }
 
-.login-btn {
-  background-color: #2196F3;
-  color: white;
-}
-
-.register-btn {
-  background-color: #4CAF50;
-  color: white;
-}
-
-.main-content {
-  display: grid;
-  gap: 20px;
+.btn:hover {
+  background-color: #1976D2;
 }
 
 .section {
   margin-bottom: 30px;
-}
-
-.section h3 {
-  color: #2c3e50;
-  margin-bottom: 15px;
 }
 
 .card {
@@ -212,52 +190,42 @@ export default {
   box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
-.filters {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 20px;
-  margin-bottom: 20px;
-  padding-bottom: 20px;
-  border-bottom: 1px solid #eee;
-}
-
-.filter-group {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.filter-group input {
-  width: 100px;
-  padding: 8px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-}
-
 .houses-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  grid-template-columns: repeat(4, 1fr);
   gap: 20px;
   margin-top: 20px;
 }
 
 .house-card {
-  background: #f8f9fa;
+  background: white;
   border-radius: 8px;
-  padding: 15px;
+  padding: 20px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  transition: transform 0.2s;
   display: flex;
   flex-direction: column;
-  gap: 15px;
+  justify-content: space-between;
+}
+
+.house-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.2);
 }
 
 .house-info {
-  flex: 1;
+  margin-bottom: 15px;
+}
+
+.house-info h4 {
+  margin: 0 0 15px 0;
+  color: #2c3e50;
 }
 
 .info-row {
   display: flex;
   justify-content: space-between;
-  margin-top: 8px;
+  margin-bottom: 8px;
 }
 
 .label {
@@ -268,75 +236,169 @@ export default {
   font-weight: 500;
 }
 
-.value.price::before {
-  content: "¥";
-  margin-right: 8px;
-}
-
 .value.price {
-  color: #e53935;
+  color: #e74c3c;
   font-weight: bold;
 }
 
 .house-actions {
   display: flex;
   justify-content: flex-end;
+  padding-top: 10px;
+  border-top: 1px solid #eee;
 }
 
-.buy-btn {
-  background-color: #4CAF50;
-  color: white;
-  padding: 8px 16px;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  font-weight: 500;
-  transition: background-color 0.3s;
-}
-
-.filter-btn {
+.action-btn {
   background-color: #2196F3;
   color: white;
   padding: 8px 16px;
   border: none;
   border-radius: 4px;
   cursor: pointer;
+  text-decoration: none;
+  transition: background-color 0.3s;
 }
 
-.reset-btn {
-  background-color: #9e9e9e;
+.action-btn:hover {
+  background-color: #1976D2;
+}
+
+.show-more {
+  text-align: center;
+  margin-top: 20px;
+}
+
+.toggle-btn {
+  background-color: #2196F3;
   color: white;
   padding: 8px 16px;
   border: none;
   border-radius: 4px;
   cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.toggle-btn:hover {
+  background-color: #1976D2;
 }
 
 .no-data {
   text-align: center;
-  color: #666;
   padding: 20px;
+  color: #666;
+  background: #f8f9fa;
+  border-radius: 8px;
 }
 
-button:hover {
-  opacity: 0.9;
+@media (max-width: 1200px) {
+  .houses-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
 }
 
-@media (max-width: 768px) {
-  .filters {
+@media (max-width: 900px) {
+  .houses-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 600px) {
+  .houses-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .header {
+    flex-direction: column;
+    gap: 15px;
+    text-align: center;
+  }
+}
+
+.filter-section {
+  margin: 20px 0;
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+  background-color: white;
+  padding: 15px;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.price-filter, .area-filter {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.price-filter input, .area-filter input {
+  width: 120px;
+  padding: 8px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  outline: none;
+}
+
+.price-filter input:focus, .area-filter input:focus {
+  border-color: #2196F3;
+}
+
+.price-filter label, .area-filter label {
+  color: #666;
+  font-weight: 500;
+}
+
+@media (max-width: 600px) {
+  .filter-section {
     flex-direction: column;
   }
   
-  .filter-group {
+  .price-filter, .area-filter {
     width: 100%;
   }
   
-  .filter-group input {
+  .price-filter input, .area-filter input {
     flex: 1;
   }
+}
+
+.filter-buttons {
+  display: flex;
+  gap: 10px;
+  align-items: flex-end;
+}
+
+.filter-btn {
+  padding: 8px 20px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.3s;
+  background-color: #2196F3;
+  color: white;
+}
+
+.filter-btn:hover {
+  background-color: #1976D2;
+}
+
+.filter-btn.reset {
+  background-color: #9e9e9e;
+}
+
+.filter-btn.reset:hover {
+  background-color: #757575;
+}
+
+@media (max-width: 600px) {
+  .filter-buttons {
+    width: 100%;
+    justify-content: space-between;
+  }
   
-  .houses-grid {
-    grid-template-columns: 1fr;
+  .filter-btn {
+    flex: 1;
   }
 }
 </style> 
